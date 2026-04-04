@@ -28,6 +28,8 @@ export function FormFieldRenderer({
   onChange,
   error,
 }: FormFieldRendererProps) {
+  const [isUploading, setIsUploading] = useState(false);
+
   const renderField = () => {
     console.log(field);
     switch (field.type) {
@@ -186,11 +188,39 @@ export function FormFieldRenderer({
         return (
           <Input
             type="file"
-            onChange={(e) => {
+            onChange={async (e) => {
               const file = e.target.files?.[0];
-              onChange(file);
+              if (!file) {
+                onChange("");
+                return;
+              }
+
+              try {
+                setIsUploading(true);
+
+                const formData = new FormData();
+                formData.append("file", file);
+
+                const response = await fetch("/api/uploads", {
+                  method: "POST",
+                  body: formData,
+                });
+
+                if (!response.ok) {
+                  throw new Error("Failed to upload file");
+                }
+
+                const data = await response.json();
+                onChange(data.url);
+              } catch (uploadError) {
+                console.error("File upload failed:", uploadError);
+                onChange("");
+              } finally {
+                setIsUploading(false);
+              }
             }}
             required={field.required}
+            disabled={isUploading}
           />
         );
 

@@ -16,6 +16,7 @@ import {
 import { Download, Eye, ChevronLeft, Link2, Sheet } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import Image from "next/image";
 
 interface ResponsesPageProps {
   params: Promise<{ id: string }>;
@@ -30,7 +31,7 @@ interface FormResponse {
 interface Form {
   id: string;
   title: string;
-  fields: Array<{ id: string; label: string }>;
+  fields: Array<{ id: string; label: string; type: string }>;
   googleSheetId?: string;
 }
 
@@ -296,7 +297,20 @@ export default function ResponsesPage({
                               key={field.id}
                               className="max-w-xs truncate"
                             >
-                              {Array.isArray(value) ? value.join(", ") : value}
+                              {Array.isArray(value) ? (
+                                value.join(", ")
+                              ) : field.type === "file" && value ? (
+                                <Image
+                                  src={value}
+                                  alt="Uploaded file"
+                                  width={100}
+                                  height={100}
+                                  className="object-cover rounded hover:scale-105 transition-transform cursor-pointer"
+                                  onClick={() => window.open(value, "_blank")}
+                                />
+                              ) : (
+                                value
+                              )}
                             </TableCell>
                           );
                         })}
