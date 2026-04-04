@@ -1,8 +1,8 @@
 import { google } from "googleapis";
 
 export async function createGoogleSheetsIntegration(
-  userId: string,
   accessToken: string,
+  title: string,
 ) {
   const oauth2Client = new google.auth.OAuth2();
 
@@ -17,7 +17,7 @@ export async function createGoogleSheetsIntegration(
   const spreadsheet = await sheets.spreadsheets.create({
     requestBody: {
       properties: {
-        title: `Form Responses - ${new Date().toISOString()}`,
+        title: `Form Responses - ${title}`,
       },
     },
   });
@@ -34,6 +34,10 @@ export async function appendToGoogleSheet(
   headers: string[],
   rows: (string | number | boolean | null)[][],
 ) {
+  if (!accessToken) {
+    throw new Error("Access token missing");
+  }
+
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({
     access_token: accessToken,
@@ -41,66 +45,31 @@ export async function appendToGoogleSheet(
 
   const sheets = google.sheets({ version: "v4", auth: oauth2Client });
 
+  // 1. Ambil nama sheet
   const spreadsheet = await sheets.spreadsheets.get({
     spreadsheetId,
     fields: "sheets(properties(title))",
   });
 
-  const sheetTitle = spreadsheet.data.sheets?.[0]?.properties?.title || "Sheet1";
-  const headerRange = `${sheetTitle}!1:1`;
-  const dataRange = `${sheetTitle}!A2`;
+  const sheetTitle =
+    spreadsheet.data.sheets?.[0]?.properties?.title || "Sheet1";
 
-  const headerRow = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: headerRange,
-  });
+  // 2. Gabungkan header + data
+  const values = [headers, ...rows];
 
-  const existingHeaders = (headerRow.data.values?.[0] ?? []).map(String);
-  const targetHeaders =
-    existingHeaders.length === 0
-      ? headers
-      : Array.from(new Set([...existingHeaders, ...headers]));
-
-  const normalizedRows = rows.map((row) => {
-    const rowMap = new Map<string, string | number | boolean | null>();
-
-    headers.forEach((header, index) => {
-      rowMap.set(header, row[index] ?? "");
-    });
-
-    return targetHeaders.map((header) => rowMap.get(header) ?? "");
-  });
-
-  if (
-    existingHeaders.length === 0 ||
-    existingHeaders.length !== targetHeaders.length ||
-    existingHeaders.some((header, index) => header !== targetHeaders[index])
-  ) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${sheetTitle}!A1`,
-      valueInputOption: "RAW",
-      requestBody: {
-        values: [targetHeaders],
-      },
-    });
-  }
-
+  // 3. Clear semua isi sheet
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: dataRange,
+    range: `${sheetTitle}`,
   });
 
-  if (normalizedRows.length === 0) {
-    return;
-  }
-
+  // 4. Tulis ulang semua data
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: dataRange,
-    valueInputOption: "RAW",
+    range: `${sheetTitle}!A1`,
+    valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: normalizedRows,
+      values,
     },
   });
 }

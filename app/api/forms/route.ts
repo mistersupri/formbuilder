@@ -2,7 +2,6 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const createFormSchema = z.object({
@@ -10,46 +9,18 @@ const createFormSchema = z.object({
   description: z.string().optional().default(""),
 });
 
-async function getAuthenticatedUserId() {
-  const session = await getServerSession(authOptions);
-
-  if (session?.user?.id) {
-    return session.user.id;
-  }
-
-  if (!session?.user?.email) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true },
-  });
-
-  return user?.id ?? null;
-}
-
-function createBaseSlug(title: string) {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50);
-
-  return slug || "form";
-}
-
 // GET /api/forms - Get all forms for authenticated user
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const userId = await getAuthenticatedUserId();
+    const session = await getServerSession(authOptions);
 
-    if (!userId) {
+    console.log("GET /api/forms - session:", session);
+    if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const forms = await prisma.form.findMany({
-      where: { userId },
+      where: { userId: session.user.id },
       select: {
         id: true,
         title: true,
@@ -77,9 +48,11 @@ export async function GET(_request: NextRequest) {
 // POST /api/forms - Create a new form
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getAuthenticatedUserId();
+    const session = await getServerSession(authOptions);
 
-    if (!userId) {
+    console.log("POST /api/forms - session:", session);
+
+    if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -87,7 +60,11 @@ export async function POST(request: NextRequest) {
     const validatedData = createFormSchema.parse(body);
 
     // Generate unique slug
-    const baseSlug = createBaseSlug(validatedData.title);
+    const baseSlug = validatedData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 50);
 
     let slug = baseSlug;
     let counter = 1;
@@ -104,8 +81,8 @@ export async function POST(request: NextRequest) {
         title: validatedData.title,
         description: validatedData.description,
         slug,
-        userId,
-        fields: [] as Prisma.InputJsonValue[],
+        userId: session.user.id || session.user.email,
+        fields: [],
       },
     });
 

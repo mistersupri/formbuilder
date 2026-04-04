@@ -14,6 +14,52 @@ const setupGoogleSchema = z.object({
   setupDrive: z.boolean().optional().default(true),
 });
 
+async function syncFormResponsesToGoogleSheets(
+  spredSheetId: string,
+  id: string,
+  userId: string,
+  form: any,
+) {
+  // Fetch all responses for this form
+  const responses = await prisma.response.findMany({
+    where: { formId: id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (responses.length === 0) {
+    return NextResponse.json({ success: true, count: 0 });
+  }
+
+  const accessToken = await getGoogleAccessToken(userId);
+
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: "Google account not connected" },
+      { status: 400 },
+    );
+  }
+
+  // Prepare headers from form fields
+  const headers = form.fields?.map((f: any) => f.label);
+
+  // Prepare rows from responses
+  const rows = responses.map((response: any) => {
+    return form.fields.map((field: any) => {
+      const value = response.data[field.id];
+      if (Array.isArray(value)) {
+        return value.join(", ");
+      }
+      return value || "";
+    });
+  });
+
+  console.log("Syncing to Google Sheets with headers:", headers);
+  console.log("Rows:", rows);
+
+  // Append to Google Sheets
+  await appendToGoogleSheet(spredSheetId, accessToken, headers, rows);
+}
+
 async function getGoogleAccessToken(userId: string) {
   const googleAccount = await prisma.account.findFirst({
     where: {
@@ -130,50 +176,49 @@ export async function POST(
     }
 
     let googleSheetId: string | null | undefined = form.googleSheetId;
-    let googleDriveFolderId: string | null | undefined =
-      form.googleDriveFolderId;
+    // let googleDriveFolderId: string | null | undefined =
+    //   form.googleDriveFolderId;
 
     // Create Google Sheets
     if (validatedData.setupSheets) {
       const sheetsResult = await createGoogleSheetsIntegration(
-        session.user.id,
         accessToken,
+        form.title,
       );
       googleSheetId = sheetsResult.spreadsheetId;
     }
 
     // Create Google Drive folder
-    if (validatedData.setupDrive) {
-      googleDriveFolderId = await createFolderInGoogleDrive(
-        session.user.id,
-        accessToken,
-        `Form - ${form.title}`,
-      );
-    }
-
-    console.log("Updating form with Google integration info:", {
-      id,
-      googleSheetId,
-      googleDriveFolderId,
-      form: {
-        googleSheetId,
-        googleDriveFolderId,
-      },
-    });
+    // if (validatedData.setupDrive) {
+    //   googleDriveFolderId = await createFolderInGoogleDrive(
+    //     session.user.id,
+    //     accessToken,
+    //     `Form - ${form.title}`,
+    //   );
+    // }
 
     // Store Google integration info
     await prisma.form.update({
       where: { id },
       data: {
         googleSheetId: googleSheetId,
-        googleDriveFolderId: googleDriveFolderId,
+        // googleDriveFolderId: googleDriveFolderId,
       },
+    });
+
+    await syncFormResponsesToGoogleSheets(
+      googleSheetId!,
+      id,
+      session.user.id,
+      form,
+    ).catch((error) => {
+      console.error("Error syncing responses to Google Sheets:", error);
     });
 
     return NextResponse.json({
       success: true,
       googleSheetId,
-      googleDriveFolderId,
+      // googleDriveFolderId,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -241,22 +286,12 @@ export async function PUT(
       );
     }
 
-    // Prepare headers from form fields
-    const headers = form.fields?.map((f: any) => f.label);
-
-    // Prepare rows from responses
-    const rows = responses.map((response: any) => {
-      return form.fields.map((field: any) => {
-        const value = response.data[field.id];
-        if (Array.isArray(value)) {
-          return value.join(", ");
-        }
-        return value || "";
-      });
-    });
-
-    // Append to Google Sheets
-    await appendToGoogleSheet(form.googleSheetId, accessToken, headers, rows);
+    await syncFormResponsesToGoogleSheets(
+      form.googleSheetId!,
+      id,
+      session.user.id,
+      form,
+    );
 
     return NextResponse.json({
       success: true,

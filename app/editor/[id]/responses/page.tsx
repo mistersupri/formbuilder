@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, Eye, ChevronLeft } from "lucide-react";
+import { Download, Eye, ChevronLeft, Link2, Sheet } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -31,6 +31,7 @@ interface Form {
   id: string;
   title: string;
   fields: Array<{ id: string; label: string }>;
+  googleSheetId?: string;
 }
 
 export default function ResponsesPage({
@@ -41,6 +42,8 @@ export default function ResponsesPage({
   const [form, setForm] = useState<Form | null>(null);
   const [responses, setResponses] = useState<FormResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [googleIntegrationLoading, setGoogleIntegrationLoading] =
+    useState(false);
 
   useEffect(() => {
     paramsPromise.then(setParams);
@@ -129,16 +132,20 @@ export default function ResponsesPage({
     if (!params?.id) return;
 
     try {
-      const response = await fetch(`/api/forms/${params.id}/google-integration`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      setGoogleIntegrationLoading(true);
+      const response = await fetch(
+        `/api/forms/${params.id}/google-integration`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            setupSheets: true,
+            setupDrive: true,
+          }),
         },
-        body: JSON.stringify({
-          setupSheets: true,
-          setupDrive: true,
-        }),
-      });
+      );
 
       const result = await response.json();
 
@@ -155,6 +162,8 @@ export default function ResponsesPage({
           ? error.message
           : "Failed to set up Google integration",
       );
+    } finally {
+      setGoogleIntegrationLoading(false);
     }
   };
 
@@ -175,14 +184,29 @@ export default function ResponsesPage({
               <p className="text-muted-foreground text-sm mt-1">{form.title}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                onClick={handleSetupGoogleIntegration}
-                disabled={responses.length === 0}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Setup Google Integration
-              </Button>
+              {form.googleSheetId ? (
+                <Button variant="secondary" asChild>
+                  <a
+                    href={`https://docs.google.com/spreadsheets/d/${form.googleSheetId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Sheet className="w-3 h-3" />
+                    View Sheets
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={handleSetupGoogleIntegration}
+                  disabled={responses.length === 0 || googleIntegrationLoading}
+                >
+                  <Sheet className="w-3 h-3" />
+                  {googleIntegrationLoading
+                    ? "Setting up..."
+                    : "Setup Google Integration"}
+                </Button>
+              )}
               <Button
                 onClick={handleExportCSV}
                 disabled={responses.length === 0}
@@ -198,7 +222,7 @@ export default function ResponsesPage({
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
@@ -227,7 +251,7 @@ export default function ResponsesPage({
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div> */}
 
         {/* Responses Table */}
         <Card>
@@ -245,15 +269,15 @@ export default function ResponsesPage({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      {form.fields.slice(0, 3).map((field) => (
+                      {form.fields.map((field) => (
                         <TableHead key={field.id}>{field.label}</TableHead>
                       ))}
-                      {form.fields.length > 3 && (
+                      {/* {form.fields.length > 3 && (
                         <TableHead className="text-muted-foreground">
                           +{form.fields.length - 3} more fields
                         </TableHead>
-                      )}
-                      <TableHead className="w-12">Actions</TableHead>
+                      )} */}
+                      {/* <TableHead className="w-12">Actions</TableHead> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -264,22 +288,18 @@ export default function ResponsesPage({
                             addSuffix: true,
                           })}
                         </TableCell>
-                        {form.fields.slice(0, 3).map((field) => {
+                        {form.fields.map((field) => {
                           const value = response.data[field.id];
                           console.log(value);
-                          return <></>;
+                          return (
+                            <TableCell
+                              key={field.id}
+                              className="max-w-xs truncate"
+                            >
+                              {Array.isArray(value) ? value.join(", ") : value}
+                            </TableCell>
+                          );
                         })}
-                        {form.fields.length > 3 && <TableCell></TableCell>}
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled
-                            title="Coming soon"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

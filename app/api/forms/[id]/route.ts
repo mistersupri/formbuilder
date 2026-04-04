@@ -2,7 +2,6 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const updateFormSchema = z.object({
@@ -12,32 +11,13 @@ const updateFormSchema = z.object({
   isPublished: z.boolean().optional(),
 });
 
-async function getAuthenticatedUserId() {
-  const session = await getServerSession(authOptions);
-
-  if (session?.user?.id) {
-    return session.user.id;
-  }
-
-  if (!session?.user?.email) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true },
-  });
-
-  return user?.id ?? null;
-}
-
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const userId = await getAuthenticatedUserId();
+    const session = await getServerSession(authOptions);
 
     const form = await prisma.form.findUnique({
       where: { id },
@@ -51,7 +31,7 @@ export async function GET(
     }
 
     // Check authorization for non-published forms
-    if (!form.isPublished && form.userId !== userId) {
+    if (!form.isPublished && form.userId !== session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -71,9 +51,8 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const userId = await getAuthenticatedUserId();
-
-    if (!userId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -85,33 +64,16 @@ export async function PUT(
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    if (form.userId !== userId) {
+    if (form.userId !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const body = await request.json();
     const validatedData = updateFormSchema.parse(body);
-    const data: Prisma.FormUpdateInput = {};
-
-    if (validatedData.title !== undefined) {
-      data.title = validatedData.title;
-    }
-
-    if (validatedData.description !== undefined) {
-      data.description = validatedData.description;
-    }
-
-    if (validatedData.isPublished !== undefined) {
-      data.isPublished = validatedData.isPublished;
-    }
-
-    if (validatedData.fields !== undefined) {
-      data.fields = validatedData.fields as Prisma.InputJsonValue[];
-    }
 
     const updatedForm = await prisma.form.update({
       where: { id },
-      data,
+      data: validatedData,
     });
 
     return NextResponse.json(updatedForm);
@@ -131,14 +93,13 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const userId = await getAuthenticatedUserId();
-
-    if (!userId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -150,7 +111,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    if (form.userId !== userId) {
+    if (form.userId !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

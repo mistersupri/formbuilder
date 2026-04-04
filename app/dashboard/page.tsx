@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { UserNav } from "@/components/dashboard/user-nav";
-import { Plus, Edit, Eye, Trash2 } from "lucide-react";
+import { Plus, Edit, Eye, Trash2, BarChart3 } from "lucide-react";
 import Link from "next/link";
 
 interface FormItem {
@@ -24,7 +24,7 @@ interface FormItem {
   title: string;
   description: string;
   slug: string;
-  published: boolean;
+  isPublished: boolean;
   createdAt: string;
   _count: {
     responses: number;
@@ -248,6 +248,16 @@ export default function DashboardPage() {
                       <Button variant="outline" size="sm" className="w-full">
                         <Eye className="w-3 h-3 mr-1" />
                         View
+                      </Button>
+                    </Link>
+                    <Link
+                      href={`/editor/${form.id}/responses`}
+                      target="_blank"
+                      className="flex-1"
+                    >
+                      <Button variant="outline" size="sm" className="w-full">
+                        <BarChart3 className="w-3 h-3 mr-1" />
+                        Responses
                       </Button>
                     </Link>
                     <Button
