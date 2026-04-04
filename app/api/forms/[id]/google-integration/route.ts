@@ -2,8 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import {
   createGoogleSheetsIntegration,
-  appendToGoogleSheet,
+  syncGoogleSheet,
   createFolderInGoogleDrive,
+  getGoogleAccessToken,
 } from "@/lib/google-sheets";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -57,87 +58,7 @@ async function syncFormResponsesToGoogleSheets(
   console.log("Rows:", rows);
 
   // Append to Google Sheets
-  await appendToGoogleSheet(spredSheetId, accessToken, headers, rows);
-}
-
-async function getGoogleAccessToken(userId: string) {
-  const googleAccount = await prisma.account.findFirst({
-    where: {
-      userId,
-      provider: "google",
-    },
-    select: {
-      provider: true,
-      providerAccountId: true,
-      access_token: true,
-      refresh_token: true,
-      expires_at: true,
-    },
-  });
-
-  if (!googleAccount) {
-    return null;
-  }
-
-  const isAccessTokenValid =
-    googleAccount.access_token &&
-    (!googleAccount.expires_at ||
-      googleAccount.expires_at * 1000 > Date.now() + 60_000);
-
-  if (isAccessTokenValid) {
-    return googleAccount.access_token;
-  }
-
-  if (!googleAccount.refresh_token) {
-    return googleAccount.access_token ?? null;
-  }
-
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      grant_type: "refresh_token",
-      refresh_token: googleAccount.refresh_token,
-    }),
-  });
-
-  if (!response.ok) {
-    console.error(
-      "Failed to refresh Google access token:",
-      await response.text(),
-    );
-    return googleAccount.access_token ?? null;
-  }
-
-  const refreshedTokens = await response.json();
-  const accessToken = refreshedTokens.access_token as string | undefined;
-
-  if (!accessToken) {
-    return googleAccount.access_token ?? null;
-  }
-
-  await prisma.account.update({
-    where: {
-      provider_providerAccountId: {
-        provider: googleAccount.provider,
-        providerAccountId: googleAccount.providerAccountId,
-      },
-    },
-    data: {
-      access_token: accessToken,
-      expires_at: refreshedTokens.expires_in
-        ? Math.floor(Date.now() / 1000 + refreshedTokens.expires_in)
-        : googleAccount.expires_at,
-      refresh_token:
-        refreshedTokens.refresh_token ?? googleAccount.refresh_token,
-    },
-  });
-
-  return accessToken;
+  await syncGoogleSheet(spredSheetId, accessToken, headers, rows);
 }
 
 export async function POST(

@@ -1,4 +1,7 @@
+import { authOptions } from "@/lib/auth";
+import { appendToGoogleSheet, getGoogleAccessToken } from "@/lib/google-sheets";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -43,6 +46,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const session = await getServerSession(authOptions);
     const { id } = await params;
     const body = await request.json();
 
@@ -69,6 +73,39 @@ export async function POST(
         data: body,
       },
     });
+
+    if (form.googleSheetId) {
+      const accessToken = await getGoogleAccessToken(session.user.id);
+
+      if (!accessToken) {
+        return NextResponse.json({ error: "Google account not connected" });
+      }
+
+      if (form.googleSheetId) {
+        // Sync response to Google Sheets
+        await appendToGoogleSheet(
+          form.googleSheetId,
+          accessToken,
+          form.fields.map((field: any) => field?.label || ""),
+          [
+            Object.values(body).map((row) => {
+              if (Array.isArray(row)) {
+                return row.join(", ");
+              }
+              if (
+                typeof row === "string" ||
+                typeof row === "number" ||
+                typeof row === "boolean" ||
+                row === null
+              ) {
+                return row;
+              }
+              return String(row);
+            }) as (string | number | boolean | null)[],
+          ],
+        );
+      }
+    }
 
     return NextResponse.json(response, { status: 201 });
   } catch (error) {

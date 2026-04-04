@@ -13,10 +13,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, Eye, ChevronLeft, Link2, Sheet } from "lucide-react";
+import {
+  Download,
+  Eye,
+  ChevronLeft,
+  Link2,
+  Sheet,
+  RefreshCw,
+} from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ResponsesPageProps {
   params: Promise<{ id: string }>;
@@ -154,11 +163,46 @@ export default function ResponsesPage({
         throw new Error(result.error || "Failed to set up Google integration");
       }
 
-      window.alert("Google integration set up successfully.");
+      toast.success("Google integration set up successfully.");
       fetchData();
     } catch (error) {
       console.error("Error setting up Google integration:", error);
-      window.alert(
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to set up Google integration",
+      );
+    } finally {
+      setGoogleIntegrationLoading(false);
+    }
+  };
+
+  const handleSyncGoogleSheet = async () => {
+    if (!params?.id) return;
+
+    try {
+      setGoogleIntegrationLoading(true);
+      const response = await fetch(
+        `/api/forms/${params.id}/google-integration`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to set up Google integration");
+      }
+
+      toast.success("Google integration set up successfully.");
+      fetchData();
+    } catch (error) {
+      console.error("Error setting up Google integration:", error);
+      toast.error(
         error instanceof Error
           ? error.message
           : "Failed to set up Google integration",
@@ -186,16 +230,35 @@ export default function ResponsesPage({
             </div>
             <div className="flex items-center gap-2">
               {form.googleSheetId ? (
-                <Button variant="secondary" asChild>
-                  <a
-                    href={`https://docs.google.com/spreadsheets/d/${form.googleSheetId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                <>
+                  <Button variant="secondary" asChild>
+                    <a
+                      href={`https://docs.google.com/spreadsheets/d/${form.googleSheetId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Sheet className="w-3 h-3" />
+                      View Sheets
+                    </a>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleSyncGoogleSheet}
+                    disabled={
+                      responses.length === 0 || googleIntegrationLoading
+                    }
                   >
-                    <Sheet className="w-3 h-3" />
-                    View Sheets
-                  </a>
-                </Button>
+                    <RefreshCw
+                      className={cn(
+                        "w-3 h-3",
+                        googleIntegrationLoading && "animate-spin",
+                      )}
+                    />
+                    {googleIntegrationLoading
+                      ? "Syncing..."
+                      : "Sync Google Sheets"}
+                  </Button>
+                </>
               ) : (
                 <Button
                   variant="secondary"
@@ -208,6 +271,7 @@ export default function ResponsesPage({
                     : "Setup Google Integration"}
                 </Button>
               )}
+
               <Button
                 onClick={handleExportCSV}
                 disabled={responses.length === 0}
