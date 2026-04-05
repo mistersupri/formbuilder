@@ -87,7 +87,6 @@ export async function createGoogleSheetsIntegration(
 ) {
   const oauth2Client = new google.auth.OAuth2();
 
-  console.log(accessToken);
   oauth2Client.setCredentials({
     access_token: accessToken,
   });

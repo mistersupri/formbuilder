@@ -10,11 +10,8 @@ export default function Login() {
   const error = searchParams.get("error");
 
   const handleGoogleSignIn = async () => {
-    console.log("Initiating Google Sign-In with callback URL:", callbackUrl);
     await signIn("google", { redirect: true, callbackUrl, prompt: "consent" });
   };
-
-  console.log("LoginPage rendered with error:", error);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">

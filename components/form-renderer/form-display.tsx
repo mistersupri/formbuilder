@@ -34,7 +34,6 @@ export function FormDisplay({
   >("idle");
 
   const handleFieldChange = (fieldId: string, value: any) => {
-    console.log(fieldId, value);
     setFormData((prev) => ({
       ...prev,
       [fieldId]: value,

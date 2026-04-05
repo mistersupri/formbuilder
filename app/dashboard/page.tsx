@@ -49,7 +49,6 @@ export default function DashboardPage() {
   }, []);
 
   const fetchForms = async () => {
-    console.log("masuk");
     try {
       const response = await fetch("/api/forms");
       if (response.ok) {

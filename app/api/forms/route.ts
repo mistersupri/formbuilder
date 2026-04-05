@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
-    console.log("GET /api/forms - session:", session);
     if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -37,7 +36,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(forms);
   } catch (error) {
-    console.error("Error fetching forms:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -49,8 +47,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    console.log("POST /api/forms - session:", session);
 
     if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -94,7 +90,6 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Error creating form:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

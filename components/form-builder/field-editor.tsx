@@ -19,8 +19,6 @@ interface FieldEditorProps {
 export function FieldEditor({ field, onUpdate, onDelete }: FieldEditorProps) {
   const [options, setOptions] = useState<FieldOption[]>(field.options || []);
 
-  console.log(field);
-
   useEffect(() => {
     setOptions(field.options || []);
   }, [field.options]);

@@ -22,10 +22,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import Image from "next/image";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { toast, useToast } from "@/hooks/use-toast";
 
 interface ResponsesPageProps {
   params: Promise<{ id: string }>;
@@ -163,15 +163,22 @@ export default function ResponsesPage({
         throw new Error(result.error || "Failed to set up Google integration");
       }
 
-      toast.success("Google integration set up successfully.");
+      toast({
+        variant: "success",
+        title: "Google integration set up successfully",
+        description: "",
+      });
       fetchData();
     } catch (error) {
       console.error("Error setting up Google integration:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to set up Google integration",
-      );
+      toast({
+        variant: "error",
+        title: "Google integration Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to set up Google integration",
+      });
     } finally {
       setGoogleIntegrationLoading(false);
     }
@@ -198,15 +205,22 @@ export default function ResponsesPage({
         throw new Error(result.error || "Failed to set up Google integration");
       }
 
-      toast.success("Google integration set up successfully.");
+      toast({
+        variant: "success",
+        title: "Sheets is synced successfully",
+        description: "",
+      });
       fetchData();
     } catch (error) {
       console.error("Error setting up Google integration:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to set up Google integration",
-      );
+      toast({
+        variant: "error",
+        title: "Failed to sync Google Sheets",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to sync Google Sheets",
+      });
     } finally {
       setGoogleIntegrationLoading(false);
     }
@@ -215,7 +229,7 @@ export default function ResponsesPage({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b">
+      <header className="border-b sticky top-0 z-10 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <Link href={`/editor/${form.id}`}>
             <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
@@ -337,25 +351,16 @@ export default function ResponsesPage({
                       {form.fields.map((field) => (
                         <TableHead key={field.id}>{field.label}</TableHead>
                       ))}
-                      {/* {form.fields.length > 3 && (
-                        <TableHead className="text-muted-foreground">
-                          +{form.fields.length - 3} more fields
-                        </TableHead>
-                      )} */}
-                      {/* <TableHead className="w-12">Actions</TableHead> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {responses.map((response) => (
                       <TableRow key={response.id}>
                         <TableCell className="text-sm">
-                          {formatDistanceToNow(new Date(response.createdAt), {
-                            addSuffix: true,
-                          })}
+                          {format(response.createdAt, "MM/dd/yyyy HH:mm")}
                         </TableCell>
                         {form.fields.map((field) => {
                           const value = response.data[field.id];
-                          console.log(value);
                           return (
                             <TableCell
                               key={field.id}

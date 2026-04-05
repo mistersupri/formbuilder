@@ -31,7 +31,6 @@ export function FormFieldRenderer({
   const [isUploading, setIsUploading] = useState(false);
 
   const renderField = () => {
-    console.log(field);
     switch (field.type) {
       case "text":
       case "email":

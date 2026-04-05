@@ -54,9 +54,6 @@ async function syncFormResponsesToGoogleSheets(
     });
   });
 
-  console.log("Syncing to Google Sheets with headers:", headers);
-  console.log("Rows:", rows);
-
   // Append to Google Sheets
   await syncGoogleSheet(spredSheetId, accessToken, headers, rows);
 }
